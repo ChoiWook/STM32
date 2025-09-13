@@ -1,333 +1,725 @@
 /* USER CODE BEGIN Header */
+
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+
+ ******************************************************************************
+
+ * @file : main.c
+
+ * @brief : Main program body
+
+ ******************************************************************************
+
+ * @attention
+
+ *
+
+ * Copyright (c) 2025 STMicroelectronics.
+
+ * All rights reserved.
+
+ *
+
+ * This software is licensed under terms that can be found in the LICENSE file
+
+ * in the root directory of this software component.
+
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+
+ *
+
+ ******************************************************************************
+
+ */
+
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
+
 #include "main.h"
+
 #include <stdio.h>
+
 #include <stdlib.h>
+
 /* Private includes ----------------------------------------------------------*/
+
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
+
 /* USER CODE BEGIN PD */
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
+
 /* USER CODE BEGIN PM */
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+int HIGH = 1;
+
+int LOW = 0;
+
+long unsigned echo_time;
+
+uint8_t dist;
+
 uint8_t ch;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
+
 void SystemClock_Config(void);
+
 static void MX_GPIO_Init(void);
+
 static void MX_USART2_UART_Init(void);
+
+static void MX_TIM1_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
+
 /* USER CODE BEGIN 0 */
+
 #ifdef __GNUC__
+
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+
 #else
+
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif /* __GNUC__ */
+
+#endif
 
 PUTCHAR_PROTOTYPE {
+
 	if (ch == '\n')
+
 		HAL_UART_Transmit(&huart2, (uint8_t*) "\r", 1, 0xFFFF);
+
 	HAL_UART_Transmit(&huart2, (uint8_t*) &ch, 1, 0xFFFF);
 
 	return ch;
+
+}
+
+///////////////////////////////
+
+void timer_start(void) {
+
+	HAL_TIM_Base_Start(&htim1);
+
+}
+
+void delay_us(uint16_t us) {
+
+	__HAL_TIM_SET_COUNTER(&htim1, 0); // initislize counter to start from 0
+
+	while ((__HAL_TIM_GET_COUNTER(&htim1)) < us)
+
+		; // wait count until us
+
+}
+
+void trig(void) {
+
+	HAL_GPIO_WritePin(Trigger_GPIO_Port, Trigger_Pin, HIGH);
+
+	delay_us(10);
+
+	HAL_GPIO_WritePin(Trigger_GPIO_Port, Trigger_Pin, LOW);
+
+}
+
+/**
+
+ * @brief echo 신호가 HIGH를 유지하는 시간을 (㎲)단위로 측정하여 리턴한다.
+
+ * @param no param(void)
+
+ */
+
+long unsigned int echo(void)
+
+{
+
+	long unsigned int echo = 0;
+
+	while (HAL_GPIO_ReadPin(Echo_GPIO_Port, Echo_Pin) == LOW) {
+	}
+
+	__HAL_TIM_SET_COUNTER(&htim1, 0);
+
+	while (HAL_GPIO_ReadPin(Echo_GPIO_Port, Echo_Pin) == HIGH)
+
+		;
+
+	echo = __HAL_TIM_GET_COUNTER(&htim1);
+
+	if (echo >= 240 && echo <= 23000)
+
+		return echo;
+
+	else
+
+		return 0;
+
 }
 
 
+void us_output(void) {
 
+	trig();
 
+	echo_time = echo();
 
-void smartcar_foward ()
-{
+	if (echo_time != 0) {
+
+		dist = (int) (17 * echo_time / 100);
+
+		printf("Distance = %d(mm)\n", dist);
+
+	} else
+
+		printf("Out of Range!\n");
+
+}
+
+////////////////////// Code Related with car moving control
+
+void smartcar_stop() {
+
+	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 0);
+
+	HAL_GPIO_WritePin(LFB_GPIO_Port, LFB_Pin, 0);
+
+	HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 0);
+
+	HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 0);
+
+	HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 0);
+
+	HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 0);
+
+	HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 0);
+
+	HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 0);
+
+}
+
+void smartcar_foward() {
+
 	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 1);
+
 	HAL_GPIO_WritePin(LFB_GPIO_Port, LFB_Pin, 0);
 
 	HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 1);
+
 	HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 0);
 
 	HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 1);
+
 	HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 0);
 
 	HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 1);
+
 	HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 0);
+
 }
 
-void smartcar_backward()
-{
+void smartcar_backward() {
+
 	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 0);
+
 	HAL_GPIO_WritePin(LFB_GPIO_Port, LFB_Pin, 1);
 
-   HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 0);
-   HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 1);
+	HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 0);
 
-   HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 0);
-   HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 1);
+	HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 1);
 
-   HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 0);
-   HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 1);
+	HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 0);
+
+	HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 1);
+
+	HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 0);
+
+	HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 1);
+
 }
 
+void smartcar_turn_left() {
 
+	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 1);
 
-void smartcar_stop()
-{
-
-	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 0);
 	HAL_GPIO_WritePin(LFB_GPIO_Port, LFB_Pin, 0);
 
-   HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 0);
-   HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 0);
+	HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 0);
 
-   HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 0);
-   HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 0);
+	HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 1);
 
-   HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 0);
-   HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 0);
+	HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 1);
 
+	HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 0);
 
+	HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 0);
+
+	HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 1);
 
 }
 
+void smartcar_turn_right() {
 
+	HAL_GPIO_WritePin(LFF_GPIO_Port, LFF_Pin, 0);
 
+	HAL_GPIO_WritePin(LFB_GPIO_Port, LFB_Pin, 1);
+
+	HAL_GPIO_WritePin(RFF_GPIO_Port, RFF_Pin, 1);
+
+	HAL_GPIO_WritePin(RFB_GPIO_Port, RFB_Pin, 0);
+
+	HAL_GPIO_WritePin(LBF_GPIO_Port, LBF_Pin, 0);
+
+	HAL_GPIO_WritePin(LBB_GPIO_Port, LBB_Pin, 1);
+
+	HAL_GPIO_WritePin(RBF_GPIO_Port, RBF_Pin, 1);
+
+	HAL_GPIO_WritePin(RBB_GPIO_Port, RBB_Pin, 0);
+
+}
 
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
 
-  /* USER CODE BEGIN 1 */
+ * @brief The application entry point.
 
-  /* USER CODE END 1 */
+ * @retval int
 
-  /* MCU Configuration--------------------------------------------------------*/
+ */
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+int main(void) {
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN 1 */
 
-  /* USER CODE END Init */
+	/* USER CODE END 1 */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* USER CODE BEGIN SysInit */
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 
-  /* USER CODE END SysInit */
+	HAL_Init();
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  /* USER CODE BEGIN 2 */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END 2 */
+	/* USER CODE END Init */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
+	/* Configure the system clock */
 
- while (1)
-  {
+	SystemClock_Config();
 
-	 HAL_UART_Receive(&huart2, &ch, 1, HAL_MAX_DELAY);
+	/* USER CODE BEGIN SysInit */
 
-	 printf("press key\n");
-	 		if (ch == 'w')
-	 		{
-	 			printf("Forward \n ");
-	 			smartcar_foward ();
+	/* USER CODE END SysInit */
+
+	/* Initialize all configured peripherals */
+
+	MX_GPIO_Init();
+
+	MX_USART2_UART_Init();
+
+	MX_TIM1_Init();
+
+	/* USER CODE BEGIN 2 */
+
+	timer_start();
+
+	printf("Ranging with HC-SR04\n");
+
+	/* USER CODE END 2 */
+
+	/* Infinite loop */
+
+	/* USER CODE BEGIN WHILE */
+
+	smartcar_stop();
+
+	while (1) {
+
+		// 초음파 센서 값 먼저 측정 및 출력
+		us_output();
+
+		// UART 수신에 타임아웃을 50ms로 설정 (비교적 짧은 시간)
+		// 키보드 입력이 없으면 50ms 뒤에 HAL_TIMEOUT 반환
+		if (HAL_UART_Receive(&huart2, &ch, 1, 50) == HAL_OK) {
+		// 키보드 입력이 있을 때만 차량 제어 코드 실행
+		if (ch == 'w') {
+		printf("Forward \n ");
+		smartcar_foward();
+		HAL_Delay(50);
+		}
+		else if (ch == 's') {
+		printf("BackWard \n");
+		smartcar_backward();
+		HAL_Delay(50);
+		}
+		else if (ch == 'a') {
+		printf("turn left \n");
+		smartcar_turn_left();
+		HAL_Delay(50);
+		}
+		else if (ch == 'd') {
+		printf(" turn right \n");
+		smartcar_turn_right();
+		HAL_Delay(50);
+		}
+		else if (ch == 'q') {
+		smartcar_stop();
+		}
+		else {
+		printf("Error: invalid value input\n");
+		}
+		}
+
+		// 다음 루프를 위해 차량을 잠시 멈춤
+		smartcar_stop();
+		HAL_Delay(50); // 초음파 측정 주기를 조절 ; 출력 속도
 
 
-	 		}
-	 		else if(ch=='s')
-	 		{
-	 			printf("BackWard \n");
-	 		 	smartcar_backward();
+		/* USER CODE END WHILE */
 
-	 		}
+		/* USER CODE BEGIN 3 */
 
-	 		else if (ch=='q')
-	 		{
-	 			smartcar_stop();
+	}
 
-	 		}
-
-
-
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
-}
-
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
+		/* USER CODE END 3 */
 
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  /* USER CODE BEGIN MX_GPIO_Init_1 */
 
-  /* USER CODE END MX_GPIO_Init_1 */
+ * @brief System Clock Configuration
 
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+ * @retval None
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED2_Pin|LD2_Pin|LBB_Pin|LFB_Pin, GPIO_PIN_RESET);
+ */
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LBF_Pin|LFF_Pin|RFB_Pin|RFF_Pin
-                          |RBB_Pin|RBF_Pin, GPIO_PIN_RESET);
+void SystemClock_Config(void) {
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
 
-  /*Configure GPIO pins : LED2_Pin LD2_Pin LBB_Pin LFB_Pin */
-  GPIO_InitStruct.Pin = LED2_Pin|LD2_Pin|LBB_Pin|LFB_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
 
-  /*Configure GPIO pins : LBF_Pin LFF_Pin RFB_Pin RFF_Pin
-                           RBB_Pin RBF_Pin */
-  GPIO_InitStruct.Pin = LBF_Pin|LFF_Pin|RFB_Pin|RFF_Pin
-                          |RBB_Pin|RBF_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/** Configure the main internal regulator output voltage
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+	 */
 
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
+	__HAL_RCC_PWR_CLK_ENABLE();
 
-  /* USER CODE END MX_GPIO_Init_2 */
+	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+	/** Initializes the RCC Oscillators according to the specified parameters
+
+	 * in the RCC_OscInitTypeDef structure.
+
+	 */
+
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+
+	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+
+	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+
+	RCC_OscInitStruct.PLL.PLLM = 16;
+
+	RCC_OscInitStruct.PLL.PLLN = 336;
+
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+
+	RCC_OscInitStruct.PLL.PLLQ = 4;
+
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+	/** Initializes the CPU, AHB and APB buses clocks
+
+	 */
+
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+
+	| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+}
+
+/**
+
+ * @brief TIM1 Initialization Function
+
+ * @param None
+
+ * @retval None
+
+ */
+
+static void MX_TIM1_Init(void) {
+
+	/* USER CODE BEGIN TIM1_Init 0 */
+
+	/* USER CODE END TIM1_Init 0 */
+
+	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+	/* USER CODE BEGIN TIM1_Init 1 */
+
+	/* USER CODE END TIM1_Init 1 */
+
+	htim1.Instance = TIM1;
+
+	htim1.Init.Prescaler = 84 - 1;
+
+	htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+
+	htim1.Init.Period = 65535;
+
+	htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+
+	htim1.Init.RepetitionCounter = 0;
+
+	htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+	if (HAL_TIM_Base_Init(&htim1) != HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+
+	if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig)
+
+	!= HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+	/* USER CODE BEGIN TIM1_Init 2 */
+
+	/* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
+
+ * @brief USART2 Initialization Function
+
+ * @param None
+
+ * @retval None
+
+ */
+
+static void MX_USART2_UART_Init(void) {
+
+	/* USER CODE BEGIN USART2_Init 0 */
+
+	/* USER CODE END USART2_Init 0 */
+
+	/* USER CODE BEGIN USART2_Init 1 */
+
+	/* USER CODE END USART2_Init 1 */
+
+	huart2.Instance = USART2;
+
+	huart2.Init.BaudRate = 115200;
+
+	huart2.Init.WordLength = UART_WORDLENGTH_8B;
+
+	huart2.Init.StopBits = UART_STOPBITS_1;
+
+	huart2.Init.Parity = UART_PARITY_NONE;
+
+	huart2.Init.Mode = UART_MODE_TX_RX;
+
+	huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+
+	huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+
+	if (HAL_UART_Init(&huart2) != HAL_OK) {
+
+		Error_Handler();
+
+	}
+
+	/* USER CODE BEGIN USART2_Init 2 */
+
+	/* USER CODE END USART2_Init 2 */
+
+}
+
+/**
+
+ * @brief GPIO Initialization Function
+
+ * @param None
+
+ * @retval None
+
+ */
+
+static void MX_GPIO_Init(void) {
+
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+
+	/* USER CODE BEGIN MX_GPIO_Init_1 */
+
+	/* USER CODE END MX_GPIO_Init_1 */
+
+	/* GPIO Ports Clock Enable */
+
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+
+	__HAL_RCC_GPIOH_CLK_ENABLE();
+
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+
+	/*Configure GPIO pin Output Level */
+
+	HAL_GPIO_WritePin(GPIOA, LD2_Pin | LBB_Pin | LFB_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+
+	HAL_GPIO_WritePin(GPIOB,
+
+	LBF_Pin | LFF_Pin | RFB_Pin | RFF_Pin | RBB_Pin | RBF_Pin,
+
+	GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+
+	HAL_GPIO_WritePin(Trigger_GPIO_Port, Trigger_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin : B1_Pin */
+
+	GPIO_InitStruct.Pin = B1_Pin;
+
+	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+
+	HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LD2_Pin LBB_Pin LFB_Pin */
+
+	GPIO_InitStruct.Pin = LD2_Pin | LBB_Pin | LFB_Pin;
+
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : Echo_Pin */
+
+	GPIO_InitStruct.Pin = Echo_Pin;
+
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+
+	HAL_GPIO_Init(Echo_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LBF_Pin LFF_Pin RFB_Pin RFF_Pin
+
+	 RBB_Pin RBF_Pin */
+
+	GPIO_InitStruct.Pin = LBF_Pin | LFF_Pin | RFB_Pin | RFF_Pin | RBB_Pin
+
+	| RBF_Pin;
+
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : Trigger_Pin */
+
+	GPIO_InitStruct.Pin = Trigger_Pin;
+
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+	HAL_GPIO_Init(Trigger_GPIO_Port, &GPIO_InitStruct);
+
+	/* USER CODE BEGIN MX_GPIO_Init_2 */
+
+	/* USER CODE END MX_GPIO_Init_2 */
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -335,33 +727,57 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
+
+ * @brief This function is executed in case of error occurrence.
+
+ * @retval None
+
+ */
+
+void Error_Handler(void) {
+
+	/* USER CODE BEGIN Error_Handler_Debug */
+
+	/* User can add his own implementation to report the HAL error return state */
+
+	__disable_irq();
+
+	while (1) {
+
+	}
+
+	/* USER CODE END Error_Handler_Debug */
+
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
+
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+
+* @brief Reports the name of the source file and the source line number
+
+* where the assert_param error has occurred.
+
+* @param file: pointer to the source file name
+
+* @param line: assert_param error line source number
+
+* @retval None
+
+*/
+
 void assert_failed(uint8_t *file, uint32_t line)
+
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+
+/* USER CODE BEGIN 6 */
+
+/* User can add his own implementation to report the file name and line number,
+
+ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+
+/* USER CODE END 6 */
+
 }
+
 #endif /* USE_FULL_ASSERT */
